@@ -8,7 +8,8 @@ public class InvestmentAccount extends Account {
         if (initialDeposit < MIN_OPENING_DEPOSIT) {
             throw new IllegalArgumentException("Minimum opening deposit for Investment Account is BWP " + MIN_OPENING_DEPOSIT);
         }
-        this.monthlyInterestRate = 0.001; // 0.1% monthly interest as example
+        // Investment accounts earn monthly interest (rate can be customized)
+        this.monthlyInterestRate = 0.0015; // 0.15% monthly interest as example
     }
 
     @Override
@@ -19,7 +20,7 @@ public class InvestmentAccount extends Account {
             System.out.println("Withdrawn: BWP " + amount + " | New Balance: BWP " + this.balance);
             return true;
         } else {
-            System.out.println("Insufficient funds or invalid amount for withdrawal");
+            System.out.println("Error: Insufficient funds or invalid amount for withdrawal");
             return false;
         }
     }
@@ -32,8 +33,8 @@ public class InvestmentAccount extends Account {
     public String toString() {
         return "InvestmentAccount{" +
                 "accountNumber='" + accountNumber + '\'' +
-                ", balance=" + balance +
-                ", interestRate=" + (monthlyInterestRate * 100) + "%" +
+                ", balance=BWP " + String.format("%.2f", balance) +
+                ", interestRate=" + String.format("%.3f", monthlyInterestRate * 100) + "%" +
                 '}';
     }
 }
