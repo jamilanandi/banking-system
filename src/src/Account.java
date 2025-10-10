@@ -10,6 +10,7 @@ public abstract class Account {
     protected Customer customer;
     protected List<Transaction> transactions;
     protected double monthlyInterestRate;
+    protected boolean interestAppliedThisMonth;
 
     public Account(String accountNumber, Customer customer, double initialDeposit) {
         this.accountNumber = accountNumber;
@@ -17,6 +18,7 @@ public abstract class Account {
         this.balance = initialDeposit;
         this.transactions = new ArrayList<>();
         this.openingDate = java.time.LocalDate.now().toString();
+        this.interestAppliedThisMonth = false;
         
         // Record initial deposit
         if (initialDeposit > 0) {
@@ -31,6 +33,7 @@ public abstract class Account {
     public Customer getCustomer() { return customer; }
     public List<Transaction> getTransactions() { return transactions; }
     public double getMonthlyInterestRate() { return monthlyInterestRate; }
+    public boolean isInterestAppliedThisMonth() { return interestAppliedThisMonth; }
 
     // Core business methods
     public void deposit(double amount) {
@@ -43,17 +46,36 @@ public abstract class Account {
 
     public abstract boolean withdraw(double amount);
 
+    /**
+     * Calculate monthly interest based on current balance and account type
+     * @return calculated interest amount
+     */
     public double calculateInterest() {
-        double interest = balance * monthlyInterestRate;
-        return interest;
+        return balance * monthlyInterestRate;
     }
 
+    /**
+     * Apply monthly interest to the account balance
+     * This should be called once per month (e.g., by a monthly scheduler)
+     */
     public void applyMonthlyInterest() {
-        double interest = calculateInterest();
-        if (interest > 0) {
-            this.balance += interest;
-            transactions.add(new Transaction("INTEREST", interest, this.balance));
+        if (monthlyInterestRate > 0) {
+            double interest = calculateInterest();
+            if (interest > 0) {
+                this.balance += interest;
+                this.interestAppliedThisMonth = true;
+                transactions.add(new Transaction("INTEREST", interest, this.balance));
+                System.out.println("Interest applied: BWP " + String.format("%.2f", interest) + 
+                                 " | New Balance: BWP " + String.format("%.2f", this.balance));
+            }
         }
+    }
+
+    /**
+     * Reset the monthly interest flag (should be called at the start of each month)
+     */
+    public void resetMonthlyInterestFlag() {
+        this.interestAppliedThisMonth = false;
     }
 
     protected void addTransaction(String type, double amount) {
