@@ -1,18 +1,26 @@
 package banking.view;
 
+import banking.service.BankingController;
+import banking.model.Transaction;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 public class TransactionView {
     private Stage primaryStage;
-    private TableView<String> transactionTable;
+    private BankingController bankingController;
     private BorderPane view;
+    private TableView<Transaction> transactionTable;
+    private ObservableList<Transaction> transactionData;
     
-    public TransactionView(Stage primaryStage) {
+    public TransactionView(Stage primaryStage, BankingController bankingController) {
         this.primaryStage = primaryStage;
+        this.bankingController = bankingController;
         createView();
+        loadTransactionData();
     }
     
     private void createView() {
@@ -21,39 +29,65 @@ public class TransactionView {
         
         // Create transaction table
         transactionTable = new TableView<>();
+        transactionData = FXCollections.observableArrayList();
+        transactionTable.setItems(transactionData);
         
-        TableColumn<String, String> dateColumn = new TableColumn<>("Date");
-        TableColumn<String, String> typeColumn = new TableColumn<>("Type");
-        TableColumn<String, String> amountColumn = new TableColumn<>("Amount");
-        TableColumn<String, String> balanceColumn = new TableColumn<>("Balance");
+        TableColumn<Transaction, String> dateColumn = new TableColumn<>("Date");
+        dateColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTimestamp()));
+        dateColumn.setPrefWidth(150);
         
-        transactionTable.getColumns().addAll(dateColumn, typeColumn, amountColumn, balanceColumn);
+        TableColumn<Transaction, String> typeColumn = new TableColumn<>("Type");
+        typeColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getType()));
+        typeColumn.setPrefWidth(120);
         
-        // Sample data
-        transactionTable.getItems().addAll(
-            "2024-01-15 | DEPOSIT | BWP 500.00 | BWP 1,500.00",
-            "2024-01-10 | INTEREST | BWP 0.38 | BWP 1,000.38",
-            "2024-01-01 | OPENING | BWP 1,000.00 | BWP 1,000.00"
-        );
+        TableColumn<Transaction, String> amountColumn = new TableColumn<>("Amount");
+        amountColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            String.format("BWP %.2f", cellData.getValue().getAmount())));
+        amountColumn.setPrefWidth(120);
+        
+        TableColumn<Transaction, String> balanceColumn = new TableColumn<>("Balance");
+        balanceColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            String.format("BWP %.2f", cellData.getValue().getFinalBalance())));
+        balanceColumn.setPrefWidth(120);
+        
+        TableColumn<Transaction, String> idColumn = new TableColumn<>("Transaction ID");
+        idColumn.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getTransactionId()));
+        idColumn.setPrefWidth(150);
+        
+        transactionTable.getColumns().addAll(dateColumn, typeColumn, amountColumn, balanceColumn, idColumn);
+        transactionTable.setPrefHeight(400);
         
         ComboBox<String> accountFilter = new ComboBox<>();
-        accountFilter.getItems().addAll("All Accounts", "SAV001 - Savings", "CHQ001 - Cheque");
+        accountFilter.getItems().add("All Accounts");
+        // Add customer accounts to filter
+        bankingController.getAccountService().getCustomerAccounts().forEach(account -> {
+            accountFilter.getItems().add(account.getAccountNumber() + " - " + 
+                account.getClass().getSimpleName().replace("Account", ""));
+        });
         accountFilter.setValue("All Accounts");
         
+        Label summaryLabel = new Label();
+        updateSummaryLabel(summaryLabel);
+        
         Button backButton = new Button("Back to Dashboard");
+        Button refreshButton = new Button("Refresh");
         
         // Layout
+        HBox filterBox = new HBox(10);
+        filterBox.setPadding(new Insets(10));
+        filterBox.getChildren().addAll(new Label("Filter by Account:"), accountFilter, refreshButton);
+        
         VBox centerBox = new VBox(15);
         centerBox.setPadding(new Insets(20));
         centerBox.getChildren().addAll(
-            new Label("Filter by Account:"),
-            accountFilter,
-            transactionTable
+            filterBox,
+            transactionTable,
+            summaryLabel
         );
         
-        HBox bottomBox = new HBox();
+        HBox bottomBox = new HBox(15);
         bottomBox.setPadding(new Insets(20));
-        bottomBox.getChildren().add(backButton);
+        bottomBox.getChildren().addAll(backButton);
         
         view = new BorderPane();
         view.setTop(titleLabel);
@@ -63,15 +97,49 @@ public class TransactionView {
         BorderPane.setMargin(titleLabel, new Insets(20));
         
         // Event handlers
+        setupEventHandlers(accountFilter, summaryLabel);
+    }
+    
+    private void loadTransactionData() {
+        transactionData.clear();
+        transactionData.addAll(bankingController.getTransactionService().getAllCustomerTransactions());
+    }
+    
+    private void updateSummaryLabel(Label summaryLabel) {
+        double totalDeposits = bankingController.getTransactionService().getTotalDeposits();
+        double totalWithdrawals = bankingController.getTransactionService().getTotalWithdrawals();
+        double totalInterest = bankingController.getInterestService().getTotalInterestEarned();
+        
+        String summaryText = String.format(
+            "Summary: Deposits: BWP %.2f | Withdrawals: BWP %.2f | Interest Earned: BWP %.2f",
+            totalDeposits, totalWithdrawals, totalInterest
+        );
+        summaryLabel.setText(summaryText);
+        summaryLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+    }
+    
+    private void setupEventHandlers(ComboBox<String> accountFilter, Label summaryLabel) {
         backButton.setOnAction(e -> {
-            DashboardView dashboardView = new DashboardView(primaryStage, "CUST001");
+            DashboardView dashboardView = new DashboardView(primaryStage, bankingController);
             primaryStage.getScene().setRoot(dashboardView.getView());
         });
         
+        refreshButton.setOnAction(e -> {
+            loadTransactionData();
+            updateSummaryLabel(summaryLabel);
+        });
+        
         accountFilter.setOnAction(e -> {
-            // This would filter transactions by selected account
             String selectedAccount = accountFilter.getValue();
-            System.out.println("Filtering by: " + selectedAccount);
+            if ("All Accounts".equals(selectedAccount)) {
+                loadTransactionData();
+            } else {
+                // Filter by specific account
+                String accountNumber = selectedAccount.split(" - ")[0];
+                transactionData.clear();
+                transactionData.addAll(bankingController.getTransactionService().getAccountTransactions(accountNumber));
+            }
+            updateSummaryLabel(summaryLabel);
         });
     }
     
