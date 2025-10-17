@@ -1,5 +1,7 @@
 package banking.view;
 
+import banking.service.BankingController;
+import banking.model.Account;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -7,21 +9,22 @@ import javafx.stage.Stage;
 
 public class DashboardView {
     private Stage primaryStage;
-    private String customerId;
+    private BankingController bankingController;
     private BorderPane view;
     private ListView<String> accountsList;
     private Label welcomeLabel;
     private Label balanceLabel;
     
-    public DashboardView(Stage primaryStage, String customerId) {
+    public DashboardView(Stage primaryStage, BankingController bankingController) {
         this.primaryStage = primaryStage;
-        this.customerId = customerId;
+        this.bankingController = bankingController;
         createView();
+        updateAccountInfo();
     }
     
     private void createView() {
         // Create UI components
-        welcomeLabel = new Label("Welcome, Customer " + customerId);
+        welcomeLabel = new Label("Welcome");
         welcomeLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
         
         balanceLabel = new Label("Total Balance: BWP 0.00");
@@ -30,19 +33,20 @@ public class DashboardView {
         accountsList = new ListView<>();
         accountsList.setPrefHeight(300);
         
-        // Sample data - in real app, this would come from controller
-        accountsList.getItems().addAll(
-            "SAV001 - Savings Account - BWP 1,500.00",
-            "CHQ001 - Cheque Account - BWP 2,300.50"
-        );
-        
         Button depositButton = new Button("Deposit");
         Button withdrawButton = new Button("Withdraw");
         Button transactionHistoryButton = new Button("Transaction History");
         Button logoutButton = new Button("Logout");
         
+        // Apply consistent button styling
+        String buttonStyle = "-fx-padding: 10px 20px; -fx-font-size: 14px;";
+        depositButton.setStyle(buttonStyle);
+        withdrawButton.setStyle(buttonStyle);
+        transactionHistoryButton.setStyle(buttonStyle);
+        logoutButton.setStyle(buttonStyle);
+        
         // Layout
-        HTop header = new HBox(20);
+        HBox header = new HBox(20);
         header.setPadding(new Insets(20));
         header.getChildren().addAll(welcomeLabel, balanceLabel);
         
@@ -68,35 +72,61 @@ public class DashboardView {
         setupEventHandlers();
     }
     
+    private void updateAccountInfo() {
+        // Get real data from services
+        String customerId = bankingController.getAccountService().getCurrentCustomer().getCustomerId();
+        double totalBalance = bankingController.getAccountService().getTotalBalance();
+        
+        welcomeLabel.setText("Welcome, Customer " + customerId);
+        balanceLabel.setText(String.format("Total Balance: BWP %.2f", totalBalance));
+        
+        // Update accounts list with real data
+        accountsList.getItems().clear();
+        for (Account account : bankingController.getAccountService().getCustomerAccounts()) {
+            String accountInfo = String.format("%s - %s - BWP %.2f", 
+                account.getAccountNumber(),
+                account.getClass().getSimpleName().replace("Account", ""),
+                account.getBalance());
+            accountsList.getItems().add(accountInfo);
+        }
+    }
+    
     private void setupEventHandlers() {
-        // These would call controllers in a real application
-        // For now, just demonstrate UI navigation
-        
+        // Deposit button - navigate to deposit view
         depositButton.setOnAction(e -> {
-            AccountView accountView = new AccountView(primaryStage, "deposit");
+            AccountView accountView = new AccountView(primaryStage, bankingController, "deposit");
             primaryStage.getScene().setRoot(accountView.getView());
         });
         
+        // Withdraw button - navigate to withdraw view  
         withdrawButton.setOnAction(e -> {
-            AccountView accountView = new AccountView(primaryStage, "withdraw");
+            AccountView accountView = new AccountView(primaryStage, bankingController, "withdraw");
             primaryStage.getScene().setRoot(accountView.getView());
         });
         
+        // Transaction History button - navigate to transaction view
         transactionHistoryButton.setOnAction(e -> {
-            TransactionView transactionView = new TransactionView(primaryStage);
+            TransactionView transactionView = new TransactionView(primaryStage, bankingController);
             primaryStage.getScene().setRoot(transactionView.getView());
         });
         
+        // Logout button - return to login
         logoutButton.setOnAction(e -> {
+            bankingController.logout();
             LoginView loginView = new LoginView(primaryStage);
             primaryStage.getScene().setRoot(loginView.getView());
         });
         
-        // Account selection
+        // Account selection - show account details when selected
         accountsList.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
-                // Would notify controller of selection
-                System.out.println("Selected account: " + newVal);
+                // Extract account number from the list item
+                String accountNumber = newVal.split(" - ")[0];
+                System.out.println("Selected account: " + accountNumber);
+                
+                // You could show a detailed view or enable/disable buttons based on account type
+                String accountType = newVal.split(" - ")[1];
+                withdrawButton.setDisable(accountType.equals("Savings")); // Disable withdraw for savings
             }
         });
     }
