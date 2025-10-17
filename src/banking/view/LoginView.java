@@ -1,5 +1,6 @@
 package banking.view;
 
+import banking.service.BankingController;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -13,9 +14,11 @@ public class LoginView {
     private PasswordField passwordField;
     private Button loginButton;
     private Label messageLabel;
+    private BankingController bankingController;
     
     public LoginView(Stage primaryStage) {
         this.primaryStage = primaryStage;
+        this.bankingController = new BankingController();
         createView();
     }
     
@@ -73,14 +76,20 @@ public class LoginView {
                 return;
             }
             
-            // This would call a controller in a real application
-            // For now, we'll simulate successful login
+            // Use the service for authentication (business logic handled by service)
             messageLabel.setText("Logging in...");
             
-            // Navigate to dashboard (UI navigation only)
-            DashboardView dashboardView = new DashboardView(primaryStage, customerId);
-            primaryStage.getScene().setRoot(dashboardView.getView());
+            if (bankingController.login(customerId, password)) {
+                // Navigate to dashboard (UI navigation only)
+                DashboardView dashboardView = new DashboardView(primaryStage, bankingController);
+                primaryStage.getScene().setRoot(dashboardView.getView());
+            } else {
+                messageLabel.setText("Invalid Customer ID or Password");
+            }
         });
+        
+        // Enter key support
+        passwordField.setOnAction(e -> loginButton.fire());
     }
     
     public VBox getView() {
